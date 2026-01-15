@@ -10,6 +10,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 from sentence_transformers import SentenceTransformer
+from transformers import BitsAndBytesConfig
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
@@ -103,16 +104,30 @@ def main():
     embedder = SentenceTransformer(args.embed_model)
 
     tok = AutoTokenizer.from_pretrained(args.base_model, use_fast=True)
+    
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
 
+
+
+    use_cuda = torch.cuda.is_available()
+
+    bnb = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_compute_dtype=torch.float16,
+    )
+
     model = AutoModelForCausalLM.from_pretrained(
         args.base_model,
-        torch_dtype=torch.float16,
+        quantization_config=bnb,
         device_map="auto",
     )
     model = PeftModel.from_pretrained(model, str(adapter_dir))
     model.eval()
+
+
 
     print("Shakespeare chat. Ctrl+C to exit.\n")
 
